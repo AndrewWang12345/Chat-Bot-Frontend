@@ -1,19 +1,30 @@
-import sys
+from fastapi import FastAPI, Form
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import torch
-import pickle
 import torch.nn as nn
-from torch.nn import functional as F
+import torch.nn.functional as F
+import pickle
+
+# Hyperparameters
 block_size = 64
-batch_size = 256
-max_iters = 5000
-learning_rate = 1e-4
-eval_iters = 200
 n_embd = 384
 n_head = 6
 n_layer = 6
 dropout = 0.2
-device = "cuda"
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# === Transformer Model Definitions (copied from your script) ===
 
 class Head(nn.Module):
     def __init__(self, head_size):
@@ -36,7 +47,6 @@ class Head(nn.Module):
         output = weights @ v
         return output
 
-
 class FeedForward(nn.Module):
     def __init__(self, n_embd):
         super().__init__()
@@ -50,7 +60,6 @@ class FeedForward(nn.Module):
     def forward(self, x):
         return self.net(x)
 
-
 class MultiHeadAttention(nn.Module):
     def __init__(self, num_heads, head_size):
         super().__init__()
@@ -61,7 +70,6 @@ class MultiHeadAttention(nn.Module):
         out = torch.cat([h(x) for h in self.heads], dim=-1)
         out = self.proj(out)
         return out
-
 
 class Block(nn.Module):
     def __init__(self, n_embd, n_head):
@@ -76,7 +84,6 @@ class Block(nn.Module):
         x = x + self.self_attention(self.layer_norm1(x))
         x = x + self.feed_forward(self.layer_norm2(x))
         return x
-
 
 class BigramLanguageModel(nn.Module):
     def __init__(self, vocab_size):
@@ -95,9 +102,8 @@ class BigramLanguageModel(nn.Module):
         x = tok_emb + pos_emb
         x = self.blocks(x)
         logits = self.language_model_head(x)
-        if targets is None:
-            loss = None
-        else:
+        loss = None
+        if targets is not None:
             B, T, C = logits.shape
             logits = logits.view(B * T, C)
             targets = targets.view(B * T)
@@ -105,30 +111,69 @@ class BigramLanguageModel(nn.Module):
         return logits, loss
 
     def generate(self, idx, max_new_tokens):
-        idx_next=0
-        while(idx_next!=46):
-            idx_condition = idx[:, -block_size:]
-            logits, loss = self(idx_condition)
+        for _ in range(max_new_tokens):
+            idx_cond = idx[:, -block_size:]
+            logits, _ = self(idx_cond)
             logits = logits[:, -1, :]
             probs = F.softmax(logits, dim=-1)
             idx_next = torch.multinomial(probs, num_samples=1)
+            if idx_next.item() == 46:
+                break
             idx = torch.cat((idx, idx_next), dim=1)
         return idx
 
+# === Load model and vocab at startup ===
+@app.on_event("startup")
+def load_model():
+    global model, vocab, decode
+    with open("saved_vocab.pkl", "rb") as f:
+        vocab = pickle.load(f)
+    model = torch.load("model.pth", map_location=device)
+    model.eval()
 
-PATH = "model.pth"
-model = torch.load(PATH, map_location=torch.device('cuda'))
-with open('saved_vocab.pkl', 'rb') as f:
-    vocab = pickle.load(f)
-def decode(ids):
-    tokens = b"".join(vocab[idx] for idx in ids)
-    text = tokens.decode("utf-8", errors="replace")
-    return text
-context = torch.zeros((1, 1), dtype=torch.long, device='cuda')
-generation = decode(model.generate(context, max_new_tokens=500)[0].tolist())
-output = ""
-for char in reversed(generation):
-    if char!='\n' and ((char>='A'and char<='Z') or (char>='a'and char<='a') or (char>='1'and char<='9')):
-        output = char+output
+    def decode_fn(ids):
+        tokens = b"".join(vocab[idx] for idx in ids)
+        return tokens.decode("utf-8", errors="replace")
 
-print(output)
+    decode = decode_fn
+
+
+# === Endpoint ===
+@app.post("/generate")
+async def generate_text(context: str = Form(...)):
+    try:
+        # Tokenize input (naively using vocab)
+        input_ids = []
+        for c in context.encode("utf-8"):
+            for i, token in enumerate(vocab):
+                if token == bytes([c]):
+                    input_ids.append(i)
+                    break
+        if not input_ids:
+            return JSONResponse(status_code=400, content={"error": "Invalid input context"})
+
+        idx = torch.tensor([input_ids], dtype=torch.long, device=device)
+        output_ids = model.generate(idx, max_new_tokens=500)[0].tolist()
+        raw_text = decode(output_ids)
+
+        # Optional filtering
+        filtered = ""
+        for char in reversed(raw_text):
+            if char != '\n' and (
+                ('A' <= char <= 'Z') or
+                ('a' <= char <= 'z') or
+                ('1' <= char <= '9')
+            ):
+                filtered = char + filtered
+
+        return {"generated_text": filtered}
+
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+if __name__ == "__main__":
+    import os
+    import uvicorn
+
+    port = int(os.getenv("WEBSITES_PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
