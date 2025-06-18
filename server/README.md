@@ -1,5 +1,5 @@
 # Language Model API – FastAPI Backend
-This is a FastAPI backend for generating text using a pretrained Transformer-based language model. The model is served via an API endpoint and takes a text context from the frontend, returning a generated string of text.
+This is a FastAPI backend for generating text using a pretrained Transformer-based language model. The model is served via an API endpoint and takes a text context from the frontend, returning a generated string of text. I originally integrated the Python GPT into a NodeJS and ExpressJs backend, but I later learned about FastAPI and changed it to avoid the extra step.
 
 ## Features
 - Loads a pretrained PyTorch language model
