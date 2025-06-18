@@ -38,20 +38,17 @@ Parameter:
 
 Example Request:
 
-<pre> 
-curl -X POST http://localhost:8000/generate \
+<pre>curl -X POST http://localhost:8000/generate \
      -F "context=The quick brown fox"
 </pre>
 Response:
 
-<pre> 
-{
+<pre>{
   "generated_text": "The quick brown fox jumps over the lazy dog."
 }
 </pre>
 🧪 Running Locally
 Start the server with:
 
-<pre> 
-python main.py
+<pre>python main.py
 </pre>
