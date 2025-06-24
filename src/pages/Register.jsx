@@ -28,7 +28,7 @@ function Register() {
                 toast.error(data.msg, toastOptions);
             } else {
                 localStorage.setItem("chat-app-user", JSON.stringify(data.user));
-                navigate("/");
+                navigate("/login");
             }
         }
     };

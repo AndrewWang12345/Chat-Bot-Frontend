@@ -1,93 +1,179 @@
-import React, {useState, useEffect,useRef} from 'react';
-import styled from 'styled-components';
-import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
-import { allUsersRoute,host } from '../assets/utils/APIRoutes';
-import Contacts from '../components/Contacts';
-import Welcome from '../components/Welcome';
-import ChatContainer from '../components/ChatContainer';
-import {io} from "socket.io-client";
+import React, { useState, useEffect, useRef } from "react";
+import styled from "styled-components";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
+
+const GenerateRoute = "http://localhost:8000/generate"; // replace with your actual backend URL
+const SaveChatRoute = "http://localhost:8000/api/chat/save"; // your backend route to save chat
+const LoadChatRoute = "http://localhost:8000/api/chat/history"; // your backend route to load chat history
+
 export default function Chat() {
-  const socket = useRef();
   const navigate = useNavigate();
-  const [contacts, setContacts] = useState([]);
   const [currentUser, setCurrentUser] = useState(undefined);
-  const [currentChat, setCurrentChat] = useState(undefined);
-  const [isLoaded,setIsLoaded] = useState(false);
-  
-  useEffect(()=>{
-    doSomething1();
-  }, []);
-  useEffect(()=>{
-    const doSomething4 = async() =>{
-      if(currentUser){
-        socket.current = io(host);
-        socket.current.emit("add-user", currentUser._id);
-      }
-    }
-    doSomething4();
-  }, [currentUser]);
-  const doSomething1 = async() =>{
-    if(!localStorage.getItem("chat-app-user")){
+  const [input, setInput] = useState("");
+  const [chatHistory, setChatHistory] = useState([]); // {sender: "user"|"ai", message: string}
+  const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    // Check for logged-in user
+    const savedUser = localStorage.getItem("chat-app-user");
+    if (!savedUser) {
       navigate("/login");
-    } else {
-      //console.log(JSON.parse(localStorage.getItem('chat-app-user')));
-      const temp = JSON.parse(localStorage.getItem('chat-app-user'));
-      setCurrentUser(temp);
-      //console.log(currentUser);
-      setIsLoaded(true);
+      return;
     }
-  }
-  
-  useEffect(()=>{
-    const doSomething2 = async() =>{
-      console.log(currentUser);
-      if(currentUser){
-        const data = await axios.get(`${allUsersRoute}/${currentUser._id}`);
-        setContacts(data.data);
-      } else {
-        navigate("/register");
+    setCurrentUser(JSON.parse(savedUser));
+  }, [navigate]);
+
+  useEffect(() => {
+    // Load chat history from backend when currentUser set
+    if (!currentUser) return;
+    const loadChatHistory = async () => {
+      try {
+        const res = await axios.get(`${LoadChatRoute}/${currentUser.username}`);
+        setChatHistory(res.data); // expect list of {sender, message}
+      } catch (err) {
+        console.error("Failed to load chat history:", err);
       }
-     }
-    doSomething2();
-  }, [currentUser])
-  const handleChatChange = (chat) => {
-    setCurrentChat(chat);
-  }
+    };
+    loadChatHistory();
+  }, [currentUser]);
+
+  useEffect(() => {
+    // Scroll to bottom on new messages
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatHistory]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!input.trim()) return;
+
+    const userMessage = input.trim();
+    // Add user message to chat history immediately
+    setChatHistory((prev) => [...prev, { sender: "user", message: userMessage }]);
+    setInput("");
+    setLoading(true);
+
+    try {
+      // Send user message to backend generate endpoint
+      const res = await axios.post(GenerateRoute, { context: userMessage });
+      const aiMessage = res.data.generated_text || "Sorry, no response.";
+
+      // Add AI response to chat history
+      setChatHistory((prev) => [...prev, { sender: "ai", message: aiMessage }]);
+
+      // Save this chat interaction in the backend DB
+      await axios.post(SaveChatRoute, {
+        username: currentUser.username,
+        question: userMessage,
+        answer: aiMessage,
+      });
+    } catch (error) {
+      console.error("Error generating or saving chat:", error);
+      setChatHistory((prev) => [...prev, { sender: "ai", message: "Error occurred. Try again later." }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Container>
-      <div className="container">
-        <Contacts contacts = {contacts} currentUser = {currentUser} changeChat={handleChatChange}/>
-        {isLoaded && currentChat === undefined ? (
-          <Welcome currentUser={currentUser}/>
-        ):(
-          <ChatContainer 
-          currentChat={currentChat} 
-          currentUser={currentUser}
-          socket={socket}/>
-        )}
-        
-      </div>
+      <ChatWindow>
+        {chatHistory.map((chat, idx) => (
+          <Message key={idx} sender={chat.sender}>
+            {chat.message}
+          </Message>
+        ))}
+        <div ref={messagesEndRef} />
+      </ChatWindow>
+      <Form onSubmit={handleSubmit}>
+        <Input
+          type="text"
+          placeholder="Type your message..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          disabled={loading}
+        />
+        <SubmitButton type="submit" disabled={loading || input.trim() === ""}>
+          {loading ? "Generating..." : "Send"}
+        </SubmitButton>
+      </Form>
     </Container>
-  )
+  );
 }
+
+// Styled components with your original dark purple color scheme
+
 const Container = styled.div`
-  height:100vh;
-  width:100vw;
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-  gap:1rem;
-  align-items:center;
-  background-color:#131324;
-  .container{
-    height:85vh;
-    width:85vw;
-    background-color:#00000076;
-    display:grid;
-    grid-template-columns: 25% 75%;
-    @media screen and (min-width: 720px) and (max-width:1080px){
-      grid-template-columns: 35% 65%;
-    }
+  height: 100vh;
+  width: 100vw;
+  background-color: #131324;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 1rem;
+`;
+
+const ChatWindow = styled.div`
+  flex: 1;
+  width: 85vw;
+  max-width: 800px;
+  background-color: #00000076;
+  border-radius: 1rem;
+  padding: 1rem;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+`;
+
+const Message = styled.div`
+  max-width: 70%;
+  background-color: ${({ sender }) => (sender === "user" ? "#4e0eff" : "#292b2f")};
+  color: white;
+  align-self: ${({ sender }) => (sender === "user" ? "flex-end" : "flex-start")};
+  padding: 0.75rem 1rem;
+  border-radius: 1rem;
+  font-size: 1rem;
+  white-space: pre-wrap;
+`;
+
+const Form = styled.form`
+  width: 85vw;
+  max-width: 800px;
+  display: flex;
+  gap: 0.5rem;
+`;
+
+const Input = styled.input`
+  flex-grow: 1;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  border-radius: 1rem;
+  border: none;
+  outline: none;
+  background-color: #1a1a2e;
+  color: white;
+`;
+
+const SubmitButton = styled.button`
+  background-color: #997af0;
+  color: white;
+  border: none;
+  border-radius: 1rem;
+  padding: 0 1.5rem;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 1rem;
+  text-transform: uppercase;
+  transition: background-color 0.3s ease;
+  &:disabled {
+    background-color: #555;
+    cursor: not-allowed;
+  }
+  &:hover:not(:disabled) {
+    background-color: #4e0eff;
   }
 `;

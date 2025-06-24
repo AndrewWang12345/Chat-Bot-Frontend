@@ -17,9 +17,7 @@ function Login() {
         if(handleValidation()){
             console.log("in validation", LoginRoute);
             const {password, username} = values;
-            const {data} = await axios.post(LoginRoute, {
-                username, password,
-            });
+            const {data} = await axios.post(LoginRoute, {username, password,});
             if(data.status === false){
                 toast.error(data.msg, toastOptions);
             } else {
