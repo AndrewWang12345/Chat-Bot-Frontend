@@ -1,6 +1,18 @@
-# Getting Started with Create React App
+# 💬 LLM Chat App (Frontend)
+A modern chat interface inspired by ChatGPT — built using **React**, **Styled Components**, **React Router**, and **Axios**. This frontend connects with a FastAPI backend for user authentication and AI-powered conversation history storage.
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+---
+
+## 🚀 Technologies Used
+
+- **React** — UI framework
+- **React Router DOM** — Client-side routing
+- **Axios** — HTTP client for API requests
+- **Styled Components** — CSS-in-JS for scoped and dynamic styles
+- **React Toastify** — Elegant toast notifications
+- **Socket.IO Client** — Real-time communication setup
+- **Vite or CRA** — (uses Create React App or other toolchain)
+
 
 ## Available Scripts
 
