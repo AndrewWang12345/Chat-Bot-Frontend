@@ -14,6 +14,10 @@ export default function Chat() {
   const [chatHistory, setChatHistory] = useState([]); // {sender: "user"|"ai", message: string}
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
+  const handleLogout = () => {
+    localStorage.removeItem("chat-app-user");
+    navigate("/login");
+  };
 
   useEffect(() => {
     // Check for logged-in user
@@ -45,39 +49,50 @@ export default function Chat() {
   }, [chatHistory]);
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!input.trim()) return;
+  e.preventDefault();
+  if (!input.trim()) return;
 
-    const userMessage = input.trim();
-    // Add user message to chat history immediately
-    setChatHistory((prev) => [...prev, { sender: "user", message: userMessage }]);
-    setInput("");
-    setLoading(true);
+  const userMessage = input.trim();
+  setChatHistory((prev) => [...prev, { sender: "user", message: userMessage }]);
+  setInput("");
+  setLoading(true);
 
-    try {
-      // Send user message to backend generate endpoint
-      const res = await axios.post(GenerateRoute, { context: userMessage });
-      const aiMessage = res.data.generated_text || "Sorry, no response.";
+  try {
+    // Send as FormData to match FastAPI Form(...) params
 
-      // Add AI response to chat history
-      setChatHistory((prev) => [...prev, { sender: "ai", message: aiMessage }]);
+    const res = await axios.post(GenerateRoute, {
+      username: currentUser.username,
+      question: userMessage,
+    });
 
-      // Save this chat interaction in the backend DB
-      await axios.post(SaveChatRoute, {
-        username: currentUser.username,
-        question: userMessage,
-        answer: aiMessage,
-      });
-    } catch (error) {
-      console.error("Error generating or saving chat:", error);
-      setChatHistory((prev) => [...prev, { sender: "ai", message: "Error occurred. Try again later." }]);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const aiMessage = res.data.generated_text || "Sorry, no response.";
+
+    setChatHistory((prev) => [...prev, { sender: "ai", message: aiMessage }]);
+
+    // Save chat (you can remove this if generate already stores it)
+    // await axios.post(SaveChatRoute, {
+    //   username: currentUser.username,
+    //   question: userMessage,
+    //   answer: aiMessage,
+    // });
+  } catch (error) {
+    console.error("Error generating or saving chat:", error);
+    setChatHistory((prev) => [
+      ...prev,
+      { sender: "ai", message: "Error occurred. Try again later." },
+    ]);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <Container>
+      <Header>
+        <h2>LLM Chat App</h2>
+        <LogoutButton onClick={handleLogout}>Logout</LogoutButton>
+      </Header>
       <ChatWindow>
         {chatHistory.map((chat, idx) => (
           <Message key={idx} sender={chat.sender}>
@@ -100,9 +115,34 @@ export default function Chat() {
       </Form>
     </Container>
   );
+
 }
 
 // Styled components with your original dark purple color scheme
+const Header = styled.div`
+  width: 85vw;
+  max-width: 800px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: white;
+  margin-bottom: 1rem;
+`;
+
+const LogoutButton = styled.button`
+  background-color: transparent;
+  color: #997af0;
+  border: 1px solid #997af0;
+  padding: 0.5rem 1rem;
+  border-radius: 1rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+  &:hover {
+    background-color: #997af0;
+    color: white;
+  }
+`;
 
 const Container = styled.div`
   height: 100vh;
