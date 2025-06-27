@@ -3,9 +3,9 @@ import styled from "styled-components";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
-const GenerateRoute = "http://localhost:8000/generate"; // replace with your actual backend URL
-const SaveChatRoute = "http://localhost:8000/api/chat/save"; // your backend route to save chat
-const LoadChatRoute = "http://localhost:8000/api/chat/history"; // your backend route to load chat history
+const GenerateRoute = "https://llmchatapp-backend-hvafa6epb5gpb0cd.canadacentral-01.azurewebsites.net/generate"; // replace with your actual backend URL
+const SaveChatRoute = "https://llmchatapp-backend-hvafa6epb5gpb0cd.canadacentral-01.azurewebsites.net/api/chat/save"; // your backend route to save chat
+const LoadChatRoute = "https://llmchatapp-backend-hvafa6epb5gpb0cd.canadacentral-01.azurewebsites.net/api/chat/history"; // your backend route to load chat history
 
 export default function Chat() {
   const navigate = useNavigate();

@@ -1,4 +1,4 @@
-export const host = "http://localhost:8000";
+export const host = "https://llmchatapp-backend-hvafa6epb5gpb0cd.canadacentral-01.azurewebsites.net";
 export const RegisterRoute = `${host}/api/auth/register`;
 export const LoginRoute = `${host}/api/auth/login`;
 export const setAvatarRoute = `${host}/api/auth/setAvatar`;
