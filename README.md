@@ -1,6 +1,6 @@
 # 💬 LLM Chat App (Frontend)
 A modern chat interface inspired by ChatGPT — built using **React**, **Styled Components**, **React Router**, and **Axios**. This frontend connects with a FastAPI backend for user authentication, history storage, and AI-powered conversation with an LLM I coded myself, from scratch!
-You can try it out here: https://chat-bot-frontend-three.vercel.app/
+
 
 ---
 
